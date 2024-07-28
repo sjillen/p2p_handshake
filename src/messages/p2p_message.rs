@@ -1,6 +1,6 @@
 use rlp::Decodable;
 
-use super::Reason;
+use crate::messages::Reason;
 
 /// Message IDs for `p2p` subprotocol messages.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

@@ -1,9 +1,9 @@
 use futures::{SinkExt, StreamExt};
-use log::{error, info};
+use log::{error, info, warn};
 use p2p_handshake::{
     error::{Error, Result},
     handshake::Handshake,
-    messages::{P2PMessage, Reason},
+    messages::P2PMessage,
     rlpx_auth::Ecies,
     rlpx_codec::RlpxCodec,
 };
@@ -14,24 +14,16 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
+    dotenvy::dotenv().ok();
     env_logger::init();
+    let enode = find_enode()?;
 
-    match parse_input() {
-        Ok((node_public_key, node_address)) => {
-            info!("Target address: {node_address}");
-            match TcpStream::connect(&node_address).await {
-                Ok(mut stream) => {
-                    info!("Connected to target address");
-                    if let Err(e) = perform_handshake(&mut stream, node_public_key).await {
-                        error!("Handshake error: {e}");
-                    }
-                }
-                Err(e) => error!("Failed to connect to the given Ethereum node: {e}"),
-            }
-        }
-        Err(e) => error!("Error parsing input: {e}"),
-    }
+    let (node_public_key, node_address) = parse_enode(enode)?;
+    let mut stream = TcpStream::connect(&node_address).await?;
+    perform_handshake(&mut stream, node_public_key).await?;
+
+    Ok(())
 }
 
 async fn perform_handshake(stream: &mut TcpStream, node_public_key: PublicKey) -> Result<()> {
@@ -41,7 +33,6 @@ async fn perform_handshake(stream: &mut TcpStream, node_public_key: PublicKey) -
     let mut framed = Framed::new(stream, RlpxCodec::new(handshake));
 
     framed.send(P2PMessage::Auth).await?;
-    info!("Auth message sent to peer");
 
     while let Some(message) = framed.next().await {
         match message {
@@ -53,9 +44,9 @@ async fn perform_handshake(stream: &mut TcpStream, node_public_key: PublicKey) -
                     info!("AuthAck message received from peer");
                 }
                 P2PMessage::Hello => {
-                    framed
-                        .send(P2PMessage::Disconnect(Reason::DisconnectRequested))
-                        .await?;
+                    // framed
+                    //     .send(P2PMessage::Disconnect(Reason::DisconnectRequested))
+                    //     .await?;
                 }
                 P2PMessage::Disconnect(reason) => {
                     info!("Disconnect message received from peer: {:?}", reason);
@@ -74,31 +65,37 @@ async fn perform_handshake(stream: &mut TcpStream, node_public_key: PublicKey) -
     Ok(())
 }
 
-fn parse_input() -> Result<(PublicKey, String)> {
+fn find_enode() -> Result<String, Error> {
     let mut args = env::args();
     let _inner = args.next();
-    let id = args
-        .next()
-        .ok_or_else(|| Error::InvalidInput("Missing node ID".to_string()))?;
-    let id_decoded =
-        hex::decode(id).map_err(|_| Error::InvalidInput("Invalid node ID".to_string()))?;
+
+    let enode = args.next();
+    if !enode.is_none() {
+        return Ok(enode.unwrap());
+    }
+    warn!("No ENODE argument found, trying to read from environment...");
+    dotenvy::var("ENODE")
+        .map_err(|_| Error::InvalidInput("No ENODE found in environment".to_string()))
+}
+
+fn parse_enode(enode: String) -> Result<(PublicKey, String)> {
+    let enode_parts: Vec<&str> = enode.split('@').collect();
+    if enode_parts.len() != 2 {
+        return Err(Error::InvalidInput("Invalid enode ID".to_string()));
+    }
+
+    let id_decoded = hex::decode(enode_parts[0])
+        .map_err(|_| Error::InvalidInput("Invalid node ID".to_string()))?;
     let public_key = public_key_from_slice(&id_decoded)?;
 
-    let ip_addr = args
-        .next()
-        .ok_or_else(|| Error::InvalidInput("Missing IP address".to_string()))?;
-    let port = args
-        .next()
-        .ok_or_else(|| Error::InvalidInput("Missing port".to_string()))?;
+    let addr = enode_parts[1];
 
-    let addr = format!("{}:{}", ip_addr, port);
-    Ok((public_key, addr))
+    Ok((public_key, addr.to_string()))
 }
 
 fn public_key_from_slice(data: &[u8]) -> Result<PublicKey> {
     const PUBLIC_KEY_LENGTH: usize = 64;
     const PUBLIC_KEY_WITH_PREFIX_LENGTH: usize = 65;
-
     if data.len() != PUBLIC_KEY_LENGTH {
         return Err(Error::InvalidInput("Invalid public key length".to_string()));
     }

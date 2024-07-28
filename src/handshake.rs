@@ -145,6 +145,7 @@ impl Handshake {
         out.extend_from_slice(mac.as_bytes());
 
         let mut len = data.len();
+        // round to nearest multiple of 16
         if len % 16 > 0 {
             len = (len / 16 + 1) * 16;
         }
