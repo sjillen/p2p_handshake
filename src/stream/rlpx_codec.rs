@@ -4,8 +4,8 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use crate::{
     error::{Error, Result},
-    handshake::Handshake,
     messages::{Disconnect, Hello, P2PMessage, P2PMessageID},
+    stream::Handshake,
 };
 
 enum State {
@@ -14,6 +14,7 @@ enum State {
     Frame,
 }
 
+// RlpxCodec is a struct that handles encoding and decoding of RLPx messages.
 pub struct RlpxCodec {
     handshake: Handshake,
     state: State,
@@ -27,12 +28,12 @@ impl RlpxCodec {
         }
     }
 
-    fn read_frame(frame: Vec<u8>) -> Result<P2PMessage> {
+    fn decode_frame(frame: Vec<u8>) -> Result<P2PMessage> {
         let message_id = rlp::decode::<P2PMessageID>(&[frame[0]]).expect("Unsupported Message ID");
         match message_id {
             P2PMessageID::Hello => {
                 let hello = rlp::decode::<Hello>(&frame[1..])?;
-                info!("Hello from peer:\n{:?}", hello);
+                info!("Peer Specs: {:?}", hello);
                 Ok(P2PMessage::Hello)
             }
             P2PMessageID::Disconnect => {
@@ -95,7 +96,7 @@ impl Decoder for RlpxCodec {
 
                 let mut buf = src.split_to(total_size);
                 let auth_ack = self.handshake.decrypt(&mut buf)?;
-                self.handshake.derive_secrets(auth_ack)?;
+                self.handshake.authenticate_stream(auth_ack)?;
 
                 self.state = State::Frame;
                 Ok(Some(P2PMessage::AuthAck))
@@ -105,10 +106,10 @@ impl Decoder for RlpxCodec {
                     return Ok(None);
                 }
 
-                match self.handshake.read_frame(&mut src[..]) {
+                match self.handshake.p2p_stream.read_frame(&mut src[..]) {
                     Ok((frame, size_used)) => {
                         src.advance(size_used);
-                        Self::read_frame(frame).map(Some)
+                        Self::decode_frame(frame).map(Some)
                     }
                     Err(e) => {
                         error!("Failed to read frame: {:?}", e);

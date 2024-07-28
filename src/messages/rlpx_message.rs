@@ -1,7 +1,7 @@
 use ethereum_types::{H128, H256};
 use secp256k1::PublicKey;
 
-use crate::{error::Error, rlpx_auth::ecies::hmac_sha256};
+use crate::{error::Error, utils::hmac_sha256};
 
 pub struct RlpxMessage<'a> {
     /// The auth data, used when checking the `tag` with HMAC-SHA256.

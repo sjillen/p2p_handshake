@@ -4,7 +4,10 @@ use secp256k1::PublicKey;
 use sha2::Digest;
 use sha3::Keccak256;
 
-use crate::rlpx_auth::{ecdh, mac::Mac, Aes256Ctr64BE, Ecies};
+use crate::{
+    rlpx_auth::{mac::Mac, Aes256Ctr64BE, Ecies},
+    utils::ecdh,
+};
 
 pub struct Secrets {
     pub aes_secret: H256,
