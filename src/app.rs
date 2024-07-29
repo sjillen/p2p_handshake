@@ -58,8 +58,8 @@ fn find_enode() -> Result<String, Error> {
     let _inner = args.next();
 
     let enode = args.next();
-    if !enode.is_none() {
-        return Ok(enode.unwrap());
+    if let Some(enode) = enode {
+        return Ok(enode);
     }
     warn!("No ENODE argument found, trying to read from environment...");
     dotenvy::var("ENODE")

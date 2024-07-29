@@ -76,7 +76,7 @@ impl Ecies {
         let encrypted_data = self.encrypt_data(data_in, &iv, &enc_key);
         let tag = hmac_sha256(
             mac_key.as_ref(),
-            &[&iv.as_bytes(), &encrypted_data],
+            &[iv.as_bytes(), &encrypted_data],
             &total_size.to_be_bytes(),
         );
 

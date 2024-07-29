@@ -58,7 +58,7 @@ impl<'a> RlpxMessage<'a> {
     pub fn check_tag_for_integrity(&self, mac_key: H256) -> Result<(), Error> {
         let remote_tag = hmac_sha256(
             mac_key.as_ref(),
-            &[&self.iv.as_bytes(), self.encrypted_data],
+            &[self.iv.as_bytes(), self.encrypted_data],
             &self.auth_data,
         );
 

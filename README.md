@@ -2,7 +2,7 @@
 
 
 ## Overview
-This project is an implementation of of a Peer to Peer handshake with an ethereum node.
+This project is an implementation of a Peer to Peer handshake with an ethereum node.
 Ethereum nodes use the RLPx protocol as documented here: https://github.com/ethereum/devp2p/blob/master/rlpx.md.
 This project can perform the handshake with any Ethereum node client (Geth, Reth, Ethermind,...).
 
